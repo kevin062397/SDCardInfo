@@ -1,5 +1,36 @@
+#include <LiquidCrystal.h>
 #include <SPI.h>
 #include <SD.h>
+#include "LCD_Keypad_Reader.h"
+
+#define ONBOARD_LED 13
+
+#define NO_KEY 0
+#define UP_KEY 3
+#define DOWN_KEY 4
+#define LEFT_KEY 2
+#define RIGHT_KEY 5
+#define SELECT_KEY 1
+
+#define MENU_SIZE 7
+#define MENU_CID_INDEX 0
+#define MENU_MID_INDEX 1
+#define MENU_OID_INDEX 2
+#define MENU_PNM_INDEX 3
+#define MENU_PRV_INDEX 4
+#define MENU_PSN_INDEX 5
+#define MENU_MDT_INDEX 6
+
+int currentPage = MENU_CID_INDEX;
+
+LCD_Keypad_Reader keypad;
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+int currentKey = 0; // The current pressed key
+int lastKey = -1;	// The last pressed key
+
+unsigned long lastKeyCheckTime = 0;
+unsigned long lastKeyPressTime = 0;
 
 // Set up variables using the SD utility library functions
 Sd2Card card;
@@ -15,6 +46,10 @@ const int chipSelect = 4;
 
 String command = "";
 
+bool isReading = false;
+bool hasSDCard = false;
+bool hasCID = false;
+
 String cidString = "";
 String midString = "";
 String oidString = "";
@@ -25,8 +60,21 @@ String mdtString = "";
 
 void setup()
 {
+	// Turn off the on-board LED
+	pinMode(ONBOARD_LED, OUTPUT);
+	digitalWrite(ONBOARD_LED, LOW);
+
 	// Open serial communications
 	Serial.begin(9600);
+
+	lcd.begin(16, 2);
+	lcd.clear();
+	lcd.setCursor(0, 0);
+	lcd.print("  SD Card Info  ");
+	delay(2000);
+
+	readCID();
+	updateMenu();
 }
 
 void loop(void)
@@ -41,6 +89,7 @@ void loop(void)
 		if (command.equals("c"))
 		{
 			readCID();
+			updateMenu();
 		}
 		else
 		{
@@ -48,20 +97,68 @@ void loop(void)
 		}
 		command = "";
 	}
+
+	if (millis() > lastKeyCheckTime + keySampleRate)
+	{
+		lastKeyCheckTime = millis();
+		currentKey = keypad.getKey();
+
+		if (currentKey != lastKey)
+		{
+			processKey();
+			lastKey = currentKey;
+		}
+	}
+}
+
+void processKey()
+{
+	switch (currentKey)
+	{
+	case SELECT_KEY:
+		readCID();
+		updateMenu();
+		break;
+	case LEFT_KEY:
+	case UP_KEY:
+		if (hasSDCard && hasCID)
+		{
+			currentPage = (currentPage == 0) ? (MENU_SIZE - 1) : (currentPage - 1);
+			updateMenu();
+		}
+		break;
+	case RIGHT_KEY:
+	case DOWN_KEY:
+		if (hasSDCard && hasCID)
+		{
+			currentPage = (currentPage == MENU_SIZE - 1) ? 0 : (currentPage + 1);
+			updateMenu();
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 void readCID()
 {
+	digitalWrite(ONBOARD_LED, HIGH);
+
 	if (!card.init(SPI_HALF_SPEED, chipSelect))
 	{
+		hasSDCard = false;
 		Serial.println("Initialization failed. No card is inserted.");
 		Serial.println();
 		return;
 	}
 
+	hasSDCard = true;
+
 	cid_t cid;
 	if (card.readCID(&cid))
 	{
+		hasCID = true;
+
 		cidString = getHexStringFromCID(cid);
 		midString = (cid.mid > 9 ? "" : "0") + String(cid.mid, HEX);
 		midString.toUpperCase();
@@ -90,10 +187,14 @@ void readCID()
 	}
 	else
 	{
+		hasCID = false;
+
 		Serial.println("Reading CID failed.");
 		Serial.println();
 		return;
 	}
+
+	digitalWrite(ONBOARD_LED, LOW);
 }
 
 // References
@@ -134,4 +235,74 @@ String get16BitHexString(unsigned int bits)
 		result += hexDigitString;
 	}
 	return result;
+}
+
+void updateMenu()
+{
+	lcd.clear();
+	if (hasSDCard)
+	{
+		if (hasCID)
+		{
+			switch (currentPage)
+			{
+			case MENU_CID_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print(cidString.substring(0, 16));
+				lcd.setCursor(0, 1);
+				lcd.print(cidString.substring(16, 32));
+				break;
+			case MENU_MID_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("Manuf. ID");
+				lcd.setCursor(0, 1);
+				lcd.print(midString);
+				break;
+			case MENU_OID_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("OEM ID");
+				lcd.setCursor(0, 1);
+				lcd.print(oidString);
+				break;
+			case MENU_PNM_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("Product Name");
+				lcd.setCursor(0, 1);
+				lcd.print(pnmString);
+				break;
+			case MENU_PRV_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("Product Rev.");
+				lcd.setCursor(0, 1);
+				lcd.print(prvString);
+				break;
+			case MENU_PSN_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("Product S/N");
+				lcd.setCursor(0, 1);
+				lcd.print(psnString);
+				break;
+			case MENU_MDT_INDEX:
+				lcd.setCursor(0, 0);
+				lcd.print("Manuf. Date");
+				lcd.setCursor(0, 1);
+				lcd.print(mdtString);
+				break;
+			default:
+				break;
+			}
+		}
+		else
+		{
+			lcd.setCursor(0, 0);
+			lcd.print("   Failed to    ");
+			lcd.setCursor(0, 1);
+			lcd.print("    Read CID    ");
+		}
+	}
+	else
+	{
+		lcd.setCursor(0, 0);
+		lcd.print("   No SD Card   ");
+	}
 }
