@@ -77,7 +77,7 @@ void setup()
 	updateMenu();
 }
 
-void loop(void)
+void loop()
 {
 	while (Serial.available() > 0)
 	{
@@ -160,14 +160,14 @@ void readCID()
 		hasCID = true;
 
 		cidString = getHexStringFromCID(cid);
-		midString = (cid.mid > 9 ? "" : "0") + String(cid.mid, HEX);
+		midString = getStringWithLeadingZeros(String(cid.mid, HEX), 2);
 		midString.toUpperCase();
 		oidString = String(cid.oid[0]) + String(cid.oid[1]);
 		pnmString = String(cid.pnm[0]) + String(cid.pnm[1]) + String(cid.pnm[2]) + String(cid.pnm[3]) + String(cid.pnm[4]);
 		prvString = String(cid.prv_n) + "." + String(cid.prv_m);
-		psnString = String(cid.psn, HEX);
+		psnString = getStringWithLeadingZeros(String(cid.psn, HEX), 8);
 		psnString.toUpperCase();
-		mdtString = String(2000 + cid.mdt_year_low + 16 * cid.mdt_year_high) + "-" + (cid.mdt_month > 9 ? "" : "0") + String(cid.mdt_month);
+		mdtString = String(2000 + cid.mdt_year_low + 16 * cid.mdt_year_high) + "-" + getStringWithLeadingZeros(String(cid.mdt_month), 2);
 
 		Serial.println();
 		Serial.println(" CID                   | " + cidString);
@@ -195,6 +195,16 @@ void readCID()
 	}
 
 	digitalWrite(ONBOARD_LED, LOW);
+}
+
+String getStringWithLeadingZeros(String input, int minimumLength)
+{
+	String result = input;
+	for (int i = result.length(); i < minimumLength; i++)
+	{
+		result = "0" + result;
+	}
+	return result;
 }
 
 // References
