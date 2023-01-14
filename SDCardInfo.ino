@@ -12,8 +12,8 @@
 #define KEYBOARD_KEY_COUNT_NEXT_CELL 1
 #define KEYBOARD_KEY_NEXT_ROW KEY_RETURN
 #define KEYBOARD_KEY_COUNT_NEXT_ROW 2
-// At the last row in Numbers, 2 return keys are required to create a new row.
-// Otherwise, use 1 return key.
+// At the last row in Numbers, 2 return keystrokes are required to create a new row.
+// Otherwise, use 1 return keystroke.
 #endif
 
 #define ONBOARD_LED 13
@@ -130,40 +130,31 @@ void loop()
 
 void processKey()
 {
-	switch (currentKey)
+	if (currentKey == SELECT_KEY)
 	{
-	case SELECT_KEY:
 		readCID();
 		updateMenu();
-		break;
-	case LEFT_KEY:
-#if SUPPORTS_HID
-		break;
-#endif
-	case UP_KEY:
-		if (hasSDCard && hasCID)
+	}
+	else if (hasSDCard && hasCID)
+	{
+		switch (currentKey)
 		{
+		case UP_KEY:
 			currentPage = (currentPage == 0) ? (MENU_SIZE - 1) : (currentPage - 1);
 			updateMenu();
-		}
-		break;
-	case RIGHT_KEY:
-#if SUPPORTS_HID
-		if (hasSDCard && hasCID)
-		{
-			sendKeystrokes();
-		}
-		break;
-#endif
-	case DOWN_KEY:
-		if (hasSDCard && hasCID)
-		{
+			break;
+		case DOWN_KEY:
 			currentPage = (currentPage == MENU_SIZE - 1) ? 0 : (currentPage + 1);
 			updateMenu();
+			break;
+#if SUPPORTS_HID
+		case RIGHT_KEY:
+			sendKeystrokes();
+			break;
+#endif
+		default:
+			break;
 		}
-		break;
-	default:
-		break;
 	}
 }
 
