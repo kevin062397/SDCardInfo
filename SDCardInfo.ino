@@ -3,6 +3,19 @@
 #include <SD.h>
 #include "LCD_Keypad_Reader.h"
 
+#define SUPPORTS_HID true
+
+#if SUPPORTS_HID
+#include <Keyboard.h>
+
+#define KEYBOARD_KEY_NEXT_CELL KEY_TAB
+#define KEYBOARD_KEY_COUNT_NEXT_CELL 1
+#define KEYBOARD_KEY_NEXT_ROW KEY_RETURN
+#define KEYBOARD_KEY_COUNT_NEXT_ROW 2
+// At the last row in Numbers, 2 return keys are required to create a new row.
+// Otherwise, use 1 return key.
+#endif
+
 #define ONBOARD_LED 13
 
 #define NO_KEY 0
@@ -75,6 +88,10 @@ void setup()
 
 	readCID();
 	updateMenu();
+
+#if SUPPORTS_HID
+	Keyboard.begin();
+#endif
 }
 
 void loop()
@@ -120,6 +137,9 @@ void processKey()
 		updateMenu();
 		break;
 	case LEFT_KEY:
+#if SUPPORTS_HID
+		break;
+#endif
 	case UP_KEY:
 		if (hasSDCard && hasCID)
 		{
@@ -128,6 +148,13 @@ void processKey()
 		}
 		break;
 	case RIGHT_KEY:
+#if SUPPORTS_HID
+		if (hasSDCard && hasCID)
+		{
+			sendKeystrokes();
+		}
+		break;
+#endif
 	case DOWN_KEY:
 		if (hasSDCard && hasCID)
 		{
@@ -316,3 +343,39 @@ void updateMenu()
 		lcd.print("   No SD Card   ");
 	}
 }
+
+#if SUPPORTS_HID
+void sendKeystrokes()
+{
+	Keyboard.print(cidString);
+	goToNextCell();
+	Keyboard.print(midString);
+	goToNextCell();
+	Keyboard.print(oidString);
+	goToNextCell();
+	Keyboard.print(pnmString);
+	goToNextCell();
+	Keyboard.print(prvString);
+	goToNextCell();
+	Keyboard.print(psnString);
+	goToNextCell();
+	Keyboard.print(mdtString);
+	goToNextRow();
+}
+
+void goToNextCell()
+{
+	for (int i = 0; i < KEYBOARD_KEY_COUNT_NEXT_CELL; i++)
+	{
+		Keyboard.write(KEYBOARD_KEY_NEXT_CELL);
+	}
+}
+
+void goToNextRow()
+{
+	for (int i = 0; i < KEYBOARD_KEY_COUNT_NEXT_ROW; i++)
+	{
+		Keyboard.write(KEYBOARD_KEY_NEXT_ROW);
+	}
+}
+#endif
